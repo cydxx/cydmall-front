@@ -7,6 +7,8 @@
       node-key="catId"
       :expand-on-click-node="false"
       :default-expanded-keys="checkedKeys"
+      draggable
+      :allow-drop="allowDrop"
     >
       <span class="custom-tree-node" slot-scope="{ node, data }">
         <span>{{ node.label }}</span>
@@ -46,6 +48,7 @@
 export default {
   data() {
     return {
+      maxLevel: 0,
       dialogType: "",
       title: "",
       dialogVisible: false,
@@ -82,9 +85,9 @@ export default {
     append(data) {
       this.dialogType = "add";
       (this.title = "新增分类"), (this.dialogVisible = true);
-      this.cataform.name="";
-      this.cataform.productUnit="";
-      this.cataform.icon="";
+      this.cataform.name = "";
+      this.cataform.productUnit = "";
+      this.cataform.icon = "";
       this.cataform.parentCid = data.catId;
       this.cataform.catLevel = data.catLevel * 1 + 1;
     },
@@ -112,7 +115,7 @@ export default {
         method: "get",
       }).then(({ data }) => {
         console.log("data---->", data);
-         this.cataform.catId = data.data.catId;
+        this.cataform.catId = data.data.catId;
         this.cataform.productUnit = data.data.productUnit;
         this.cataform.icon = data.data.icon;
         this.cataform.name = data.data.name;
@@ -172,6 +175,26 @@ export default {
             message: "已取消删除",
           });
         });
+    },
+    allowDrop(draggingNode, dropNode, type) {
+      this.countNodeLevel(draggingNode.data);
+
+      let deep = (this.maxLevel - draggingNode.data.catLevel)+1
+      if(type == 'inner'){
+        return (deep + dropNode.level) <= 3
+      }else{
+         return (deep + dropNode.parent.level) <= 3
+      }
+
+    },
+    countNodeLevel(node) {
+      if (node.children != null && node.children.length > 0) {
+        for (let i = 0; i < node.children.length; i++) {
+          if (node.children[i].catLevel > this.maxLevel)
+            this.maxLevel = node.children.catLevel;
+        }
+        countNodeLevel(node.children[i]);
+      }
     },
   },
   created() {
