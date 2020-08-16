@@ -2,6 +2,7 @@
   <div>
     <el-switch v-model="dragFlag" active-text="开启拖拽" inactive-text="关闭拖拽"></el-switch>
     <el-button v-if="dragFlag" @click="saveBatch">批量保存</el-button>
+    <el-button type="danger" @click="deleteBatch">批量删除</el-button>
     <el-tree
       :data="menus"
       :props="defaultProps"
@@ -12,6 +13,7 @@
       @node-drop="handleDrop"
       :draggable="dragFlag"
       :allow-drop="allowDrop"
+       ref="menuNodes"
     >
       <span class="custom-tree-node" slot-scope="{ node, data }">
         <span>{{ node.label }}</span>
@@ -257,6 +259,41 @@ export default {
           this.upupdateChildNodeLevel(node.childNodes[i]);
         }
       }
+    },
+
+    deleteBatch(){
+      let catIds = [];
+      let catNames = [];
+      let nodes = this.$refs.menuNodes.getCheckedNodes()
+      for(let i=0;i<nodes.length;i++){
+        catIds.push(nodes[i].catId)
+        catNames.push(nodes[i].name)
+      }
+      this.$confirm(`是否删除当前数据【${catNames}】？`, "提示", {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
+      }).then(() => {
+          this.$http({
+            url: this.$http.adornUrl("/product/category/delete"),
+            method: "post",
+            data: this.$http.adornData(catIds, false),
+          }).then(({ data }) => {
+            if (data && data.code === 0) {
+              this.$message({
+                type: "success",
+                message: "删除成功！",
+              });
+              this.getMenus();
+            }
+          });
+        })
+        .catch(() => {
+          this.$message({
+            type: "info",
+            message: "已取消删除",
+          });
+        });
     }
   },
   created() {
