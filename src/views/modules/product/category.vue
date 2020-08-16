@@ -1,5 +1,7 @@
 <template>
   <div>
+    <el-switch v-model="dragFlag" active-text="开启拖拽" inactive-text="关闭拖拽"></el-switch>
+    <el-button v-if="dragFlag" @click="saveBatch">批量保存</el-button>
     <el-tree
       :data="menus"
       :props="defaultProps"
@@ -7,7 +9,8 @@
       node-key="catId"
       :expand-on-click-node="false"
       :default-expanded-keys="checkedKeys"
-      draggable
+      @node-drop="handleDrop"
+      :draggable="dragFlag"
       :allow-drop="allowDrop"
     >
       <span class="custom-tree-node" slot-scope="{ node, data }">
@@ -48,6 +51,9 @@
 export default {
   data() {
     return {
+      pCid:[],
+      dragFlag: false,
+      updateNodes: [],
       maxLevel: 0,
       dialogType: "",
       title: "",
@@ -176,26 +182,82 @@ export default {
           });
         });
     },
+    saveBatch() {
+      this.$http({
+        url: this.$http.adornUrl("/product/category/update/sort"),
+        method: "post",
+        data: this.$http.adornData(this.updateNodes, false),
+      }).then(({ data }) => {
+        this.$message({
+          type: "success",
+          message: "更新成功！",
+        });
+        this.getMenus();
+        this.checkedKeys = this.pCid;
+        this.updateNodes = [];
+        this.maxLevel = 0;
+      });
+    },
     allowDrop(draggingNode, dropNode, type) {
-      this.countNodeLevel(draggingNode.data);
+      this.countNodeLevel(draggingNode);
 
-      let deep = (this.maxLevel - draggingNode.data.catLevel)+1
-      if(type == 'inner'){
-        return (deep + dropNode.level) <= 3
-      }else{
-         return (deep + dropNode.parent.level) <= 3
+      let deep = this.maxLevel - draggingNode.level + 1;
+      if (type == "inner") {
+        return deep + dropNode.level <= 3;
+      } else {
+        return deep + dropNode.parent.level <= 3;
       }
-
     },
     countNodeLevel(node) {
-      if (node.children != null && node.children.length > 0) {
-        for (let i = 0; i < node.children.length; i++) {
-          if (node.children[i].catLevel > this.maxLevel)
-            this.maxLevel = node.children.catLevel;
+      if (node.childNodes != null && node.childNodes.length > 0) {
+        for (let i = 0; i < node.childNodes.length; i++) {
+          if (node.childNodes[i].level > this.maxLevel)
+            this.maxLevel = node.childNodes[i].level;
         }
-        countNodeLevel(node.children[i]);
+        countNodeLevel(node.childNodes[i]);
       }
     },
+    handleDrop(draggingNode, dropNode, dropType, ev) {
+      console.log("tree drop: ", dropNode.label, dropType);
+      let pCid = 0;
+      let sibling = null;
+      if (dropType == "before" || dropType == "after") {
+        pCid = dropNode.parent.catId;
+        sibling = dropNode.parent.childNodes;
+      } else {
+        pCid = dropNode.data.catId;
+        sibling = dropNode.childNodes;
+      }
+      for (let i = 0; i < sibling.length; i++) {
+        if (sibling[i].data.catId == draggingNode.data.catId) {
+          let catlevel = draggingNode.level;
+          if (sibling[i].level != draggingNode.level) {
+            catlevel = sibling[i].level;
+            this.updateChildNodeLevel(sibling[i]);
+          }
+          this.updateNodes.push({
+            catId: sibling[i].data.catId,
+            sort: i,
+            parentCid: pCid,
+          });
+        } else {
+          this.updateNodes.push({ catId: sibling[i].data.catId, sort: i });
+        }
+      }
+      this.pCid.push(pCid)
+    },
+    updateChildNodeLevel(node) {
+      if (node.childNodes.length > 0) {
+        for (let i = 0; i < node.childNodes.length; i++) {
+          var cNode = node.childNodes[i].data;
+          this.updateNodes.push({
+            catId: cNode,
+            catLevel: node.childNodes[i].level,
+          });
+          this.upupdateChildNodeLevel(node.childNodes[i]);
+        }
+      }
+    }
   },
   created() {
     this.getMenus();
